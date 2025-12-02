@@ -1,26 +1,30 @@
 #include "table.h"
+using namespace std;
+
 
 int main() {
     Table t;
     const char cols[3][32] = {"id", "name", "age"};
     t.create(cols, 3);
 
-    const char r1[3][32] = {"3", "Carol", "19"};
-    const char r2[3][32] = {"1", "Alice", "20"};
-    const char r3[3][32] = {"2", "Bob",   "22"};
+    /* insert */
+    const char r1[3][32] = {"10", "Alice", "20"};
+    const char r2[3][32] = {"20", "Bob",   "22"};
     t.insert(r1, 3);
     t.insert(r2, 3);
-    t.insert(r3, 3);
-
-    std::cout << "--- original ---\n";
+    std::cout << "---- memory ----\n";
     t.print();
 
-    std::cout << "--- sorted by name ---\n";
-    t.sortBy(1);   // column index 1 = name
-    t.print();
+    /* persist */
+    t.save("db.bin");
+    std::cout << "saved to db.bin\n";
 
-    std::cout << "--- where age = 20 ---\n";
-    t.printWhere(2, "20");
+    /* clear memory & reload */
+    Table t2;
+    t2.create(cols, 3);
+    t2.load("db.bin");
+    std::cout << "---- loaded ----\n";
+    t2.print();
 
     return 0;
 }

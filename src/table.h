@@ -1,6 +1,7 @@
 #ifndef TABLE_H
 #define TABLE_H
 #include "row.h"
+#include "pager.h"
 #include <iostream>
 #include <cstring>
 using namespace std;
@@ -8,6 +9,7 @@ using namespace std;
 class Table
 {
 public:
+    Pager pager;
     // data
     char colNames[10][32]{};
     int colCount{0};
@@ -112,7 +114,7 @@ public:
             }
         } while (swapped);
     }
-    //finding and showing the data of where the data become equal to what we are looking for
+    // finding and showing the data of where the data become equal to what we are looking for
     void printWhere(int colIdx, const char *val)
     {
         if (colIdx < 0 || colIdx >= colCount)
@@ -129,6 +131,80 @@ public:
                 std::cout << '\n';
             }
         }
+    }
+
+    /* ---- serialize one row into page ---- */
+    int curPageId{0};
+    int curOffset{0};
+
+    void flushRowToDisk(Row *r)
+    {
+        Page p{};
+        int pos = 0;
+        for (Value *v = r->head; v; v = v->next)
+        {
+            std::strcpy(p.bytes + pos, v->data);
+            pos += 32; // fixed cell size
+        }
+        pager.write(curPageId++, p); // simple: one row per page
+    }
+
+    /* ---- load one row from page ---- */
+    Row *loadRowFromPage(int pageId)
+    {
+        Page p{};
+        if (!pager.read(pageId, p))
+            return nullptr;
+        Value *head = nullptr;
+        Value *prev = nullptr;
+        for (int i = 0; i < colCount; ++i)
+        {
+            Value *v = new Value;
+            std::strcpy(v->data, p.bytes + i * 32);
+            v->next = nullptr;
+            if (!head)
+                head = v;
+            if (prev)
+                prev->next = v;
+            prev = v;
+        }
+        return new Row{head, nullptr};
+    }
+
+    bool save(const char *file)
+    {
+        // open with truncate=true so we start fresh for saving
+        if (!pager.open(file, true))
+            return false;
+        curPageId = 0;
+        for (Row *p = firstRow; p; p = p->next)
+            flushRowToDisk(p);
+        pager.close();
+        return true;
+    }
+
+    bool load(const char *file)
+    {
+        if (!pager.open(file))
+            return false;
+        curPageId = 0;
+        while (true)
+        {
+            Row *r = loadRowFromPage(curPageId);
+            if (!r)
+                break;
+            /* append to linked list */
+            if (!firstRow)
+                firstRow = lastRow = r;
+            else
+            {
+                lastRow->next = r;
+                lastRow = r;
+            }
+            ++curPageId;
+        }
+        pager.close();
+        return true;
     }
 };
 
