@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstring>
-#include <fstream>
 
 // ---------- one cell ----------
 struct Value {
@@ -21,11 +20,13 @@ struct Table {
     Row*   firstRow{nullptr};
     Row*   lastRow{nullptr};
 
+    // CREATE TABLE (name1, name2, ...)
     void create(const char names[][32], int n) {
         colCount = n;
         for (int i = 0; i < n; ++i) std::strcpy(cols[i], names[i]);
     }
 
+    // INSERT INTO table VALUES (v1, v2, ...)
     void insert(const char values[][32], int n) {
         if (n != colCount) { std::cout << "Column count mismatch\n"; return; }
         Value* head = nullptr, *prev = nullptr;
@@ -42,6 +43,7 @@ struct Table {
         else { lastRow->next = r; lastRow = r; }
     }
 
+    // bubble-sort rows by column idx
     void sortBy(int idx) {
         if (idx < 0 || idx >= colCount) return;
         bool swapped;
@@ -51,6 +53,7 @@ struct Table {
             while (*cur && (*cur)->next) {
                 Row* a = *cur;
                 Row* b = a->next;
+                // grab cell values
                 Value* va = a->head;
                 Value* vb = b->head;
                 for (int i = 0; i < idx; ++i) { va = va->next; vb = vb->next; }
@@ -65,6 +68,7 @@ struct Table {
         } while (swapped);
     }
 
+    // PRINT entire table
     void print() {
         for (int i = 0; i < colCount; ++i) std::cout << cols[i] << '\t';
         std::cout << '\n';
@@ -73,72 +77,41 @@ struct Table {
             std::cout << '\n';
         }
     }
+
+    // PRINT WHERE col = val
+    void printWhere(int idx, const char* val) {
+        if (idx < 0 || idx >= colCount) return;
+        for (Row* p = firstRow; p; p = p->next) {
+            Value* v = p->head;
+            for (int i = 0; i < idx; ++i) v = v->next;
+            if (std::strcmp(v->data, val) == 0) {
+                for (Value* cell = p->head; cell; cell = cell->next)
+                    std::cout << cell->data << '\t';
+                std::cout << '\n';
+            }
+        }
+    }
 };
 
-/* ---------- 3-arg wrapper ---------- */
-inline void ins(Table& t, const char* a, const char* b, const char* c) {
-    char v[3][32] = {};
-    std::strcpy(v[0], a);
-    std::strcpy(v[1], b);
-    std::strcpy(v[2], c);
-    t.insert(v, 3);
-}
-
-/* ---------- disk I/O ---------- */
-void saveTable(const Table& t, const char* filename) {
-    std::ofstream f(filename);
-    if (!f) return;
-    f << t.colCount << '\n';
-    for (int i = 0; i < t.colCount; ++i) f << t.cols[i] << '\n';
-    for (Row* p = t.firstRow; p; p = p->next) {
-        for (Value* v = p->head; v; v = v->next) f << v->data << '\t';
-        f << '\n';
-    }
-}
-
-bool loadTable(Table& t, const char* filename) {
-    std::ifstream f(filename);
-    if (!f) return false;
-    f >> t.colCount;  f.ignore();
-    for (int i = 0; i < t.colCount; ++i) f.getline(t.cols[i], 32);
-    char line[256];
-    while (f.getline(line, 256)) {
-        char values[10][32]; int idx = 0;
-        char* tok = std::strtok(line, "\t");
-        while (tok && idx < 10) {
-            std::strcpy(values[idx++], tok);
-            tok = std::strtok(nullptr, "\t");
-        }
-        t.insert(values, idx);
-    }
-    return true;
-}
-
-/* ---------- main ---------- */
-/* ---------- main ---------- */
+// ---------- tiny CLI ----------
 int main() {
     Table t;
-    const char* file = "db.txt";
+    const char cols[3][32] = {"id", "name", "age"};
+    t.create(cols, 3);
 
-    /* ALWAYS create schema first */
-    t.create((const char [3][32]){"id", "name", "age"}, 3);
+    t.insert((const char [3][32]){"3", "Carol", "19"});
+    t.insert((const char [3][32]){"1", "Alice", "20"});
+    t.insert((const char [3][32]){"2", "Bob", "22"});
 
-    bool existed = loadTable(t, file);
-    if (existed) {
-        std::cout << "--- loaded from disk ---\n";
-        /* DO NOT insert again */
-    } else {
-        std::cout << "--- fresh table ---\n";
-        ins(t, "3", "Carol", "19");
-        ins(t, "1", "Alice", "20");
-        ins(t, "2", "Bob", "22");
-    }
+    std::cout << "--- original ---\n";
+    t.print();
 
-    std::cout << "--- sorted ---\n";
+    std::cout << "--- sorted by name ---\n";
     t.sortBy(1);
     t.print();
 
-    saveTable(t, file);
-    std::cout << "saved to " << file << '\n';
+    std::cout << "--- where age = 20 ---\n";
+    t.printWhere(2, "20");
+
     return 0;
 }
