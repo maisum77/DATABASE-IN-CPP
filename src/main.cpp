@@ -1,144 +1,85 @@
 #include <iostream>
-#include <cstring>
-#include <fstream>
+using namespace std;
 
-// ---------- one cell ----------
-struct Value {
-    char     data[32]{};
-    Value*   next{nullptr};
-};
 
-// ---------- one row ----------
-struct Row {
-    Value* head{nullptr};
-    Row*   next{nullptr};
-};
 
-// ---------- tiny table ----------
-struct Table {
-    char   cols[10][32]{};
-    int    colCount{0};
-    Row*   firstRow{nullptr};
-    Row*   lastRow{nullptr};
+class table
+{
+private:
+    vector<vector<string>> form;
 
-    void create(const char names[][32], int n) {
-        colCount = n;
-        for (int i = 0; i < n; ++i) std::strcpy(cols[i], names[i]);
-    }
+public:
+    int index_of_attributes = 0;
+    int index_for_values = 1;
 
-    void insert(const char values[][32], int n) {
-        if (n != colCount) { std::cout << "Column count mismatch\n"; return; }
-        Value* head = nullptr, *prev = nullptr;
-        for (int i = 0; i < n; ++i) {
-            Value* v = new Value;
-            std::strcpy(v->data, values[i]);
-            v->next = nullptr;
-            if (!head) head = v;
-            if (prev) prev->next = v;
-            prev = v;
+    void add_attirbute(string name)
+    {
+        if (form.empty())
+        {
+            form.push_back({}); // create header
         }
-        Row* r = new Row{head, nullptr};
-        if (!firstRow) firstRow = lastRow = r;
-        else { lastRow->next = r; lastRow = r; }
+        form[0].push_back(name);
     }
 
-    void sortBy(int idx) {
-        if (idx < 0 || idx >= colCount) return;
-        bool swapped;
-        do {
-            swapped = false;
-            Row** cur = &firstRow;
-            while (*cur && (*cur)->next) {
-                Row* a = *cur;
-                Row* b = a->next;
-                Value* va = a->head;
-                Value* vb = b->head;
-                for (int i = 0; i < idx; ++i) { va = va->next; vb = vb->next; }
-                if (std::strcmp(va->data, vb->data) > 0) {
-                    a->next = b->next;
-                    b->next = a;
-                    *cur = b;
-                    swapped = true;
-                }
-                cur = &((*cur)->next);
+    void add_value(const vector<string> &values)
+    {
+        vector<string> row(form[0].size(), "null");
+        for (int i = 0; i < values.size() && i < row.size(); ++i)
+        {
+            row[i] = values[i];
+        }
+        form.push_back(row); 
+    }
+    void update(int row_index, const string &col_name, const string &new_value)
+    {
+        if (form.empty() || row_index < 1 || row_index >= form.size())
+        {
+            cout << "[Error] Invalid row index.\n";
+            return;
+        }
+
+        int col_idx = -1;
+        for (int i = 0; i < form[0].size(); ++i)
+        {
+            if (form[0][i] == col_name)
+            {
+                col_idx = i;
+                break;
             }
-        } while (swapped);
+        }
+
+        if (col_idx == -1)
+        {
+            cout << "[Error] Column '" << col_name << "' not found.\n";
+            return;
+        }
+
+        form[row_index][col_idx] = new_value;
     }
 
-    void print() {
-        for (int i = 0; i < colCount; ++i) std::cout << cols[i] << '\t';
-        std::cout << '\n';
-        for (Row* p = firstRow; p; p = p->next) {
-            for (Value* v = p->head; v; v = v->next) std::cout << v->data << '\t';
-            std::cout << '\n';
+    void display_table()
+    {
+        for (const auto &row : form)
+        {
+            for (const string &cell : row)
+            {
+                cout << cell << "\t";
+            }
+            cout << endl;
         }
     }
 };
-
-/* ---------- 3-arg wrapper ---------- */
-inline void ins(Table& t, const char* a, const char* b, const char* c) {
-    char v[3][32] = {};
-    std::strcpy(v[0], a);
-    std::strcpy(v[1], b);
-    std::strcpy(v[2], c);
-    t.insert(v, 3);
-}
-
-/* ---------- disk I/O ---------- */
-void saveTable(const Table& t, const char* filename) {
-    std::ofstream f(filename);
-    if (!f) return;
-    f << t.colCount << '\n';
-    for (int i = 0; i < t.colCount; ++i) f << t.cols[i] << '\n';
-    for (Row* p = t.firstRow; p; p = p->next) {
-        for (Value* v = p->head; v; v = v->next) f << v->data << '\t';
-        f << '\n';
-    }
-}
-
-bool loadTable(Table& t, const char* filename) {
-    std::ifstream f(filename);
-    if (!f) return false;
-    f >> t.colCount;  f.ignore();
-    for (int i = 0; i < t.colCount; ++i) f.getline(t.cols[i], 32);
-    char line[256];
-    while (f.getline(line, 256)) {
-        char values[10][32]; int idx = 0;
-        char* tok = std::strtok(line, "\t");
-        while (tok && idx < 10) {
-            std::strcpy(values[idx++], tok);
-            tok = std::strtok(nullptr, "\t");
-        }
-        t.insert(values, idx);
-    }
-    return true;
-}
-
-/* ---------- main ---------- */
-/* ---------- main ---------- */
-int main() {
-    Table t;
-    const char* file = "db.txt";
-
-    /* ALWAYS create schema first */
-    t.create((const char [3][32]){"id", "name", "age"}, 3);
-
-    bool existed = loadTable(t, file);
-    if (existed) {
-        std::cout << "--- loaded from disk ---\n";
-        /* DO NOT insert again */
-    } else {
-        std::cout << "--- fresh table ---\n";
-        ins(t, "3", "Carol", "19");
-        ins(t, "1", "Alice", "20");
-        ins(t, "2", "Bob", "22");
-    }
-
-    std::cout << "--- sorted ---\n";
-    t.sortBy(1);
-    t.print();
-
-    saveTable(t, file);
-    std::cout << "saved to " << file << '\n';
-    return 0;
+int main()
+{
+    table tt;
+    tt.add_attirbute("ID");
+    tt.add_attirbute("name");
+    tt.add_attirbute("dept");
+    tt.add_value({"101", "maisum"});
+    tt.add_value({"102", "AON", "BSCS"});
+    tt.add_value({"103", "Umair"});
+    tt.display_table();
+    tt.update(2,"name","ALi");
+    tt.update(1,"dept","cs");
+    tt.display_table();
 }
