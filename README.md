@@ -150,4 +150,4 @@ Exports as `tablename.csv`.
 
 ## 📜 License
 
-No license included by default. You may add MIT, Apache, GPL, or custom.
+MIT Licensed
