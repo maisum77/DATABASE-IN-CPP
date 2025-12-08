@@ -1,7 +1,0 @@
-3
-id
-name
-age
-1	Alice	20	
-2	Bob	22	
-3	Carol	19	
