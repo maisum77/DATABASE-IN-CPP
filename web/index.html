@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniDB Web - Interactive Database Engine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Terminal Panel */
+        .terminal-panel {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .terminal-header {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            padding: 10px 15px;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #terminal-output {
+            flex: 1;
+            background: #0a0e27;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            overflow-y: auto;
+            border-radius: 0 0 8px 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        #terminal-input-wrapper {
+            display: flex;
+            margin-top: 10px;
+        }
+
+        #terminal-input {
+            flex: 1;
+            background: #0a0e27;
+            border: 1px solid #4ecdc4;
+            color: #00ff88;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+        }
+
+        #terminal-input:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        #execute-btn {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            margin-left: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #execute-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Visualization Panel */
+        .viz-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .table-viz {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .table-viz h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .table-data {
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        th {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9ff;
+        }
+
+        tr:hover {
+            background: #e8f4fd;
+        }
+
+        .pk-indicator {
+            background: #ff9f43;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        .fk-indicator {
+            background: #54a0ff;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        .relationship-viz {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex: 1;
+        }
+
+        .relationship-viz h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .schema-diagram {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .table-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .table-card.connected {
+            border-color: #4ecdc4;
+            box-shadow: 0 4px 20px rgba(78, 205, 196, 0.3);
+        }
+
+        .table-card.standalone {
+            border-color: #95a5a6;
+        }
+
+        .table-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .table-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .column-list {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .column-list div {
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .column-list div:last-child {
+            border-bottom: none;
+        }
+
+        .connection-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .command-help {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+
+        .command-help h4 {
+            margin-bottom: 10px;
+            color: #feca57;
+        }
+
+        .command-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+        }
+
+        .command {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .command code {
+            color: #4ecdc4;
+        }
+
+        .error-output {
+            color: #ff6b6b;
+        }
+
+        .success-output {
+            color: #00ff88;
+        }
+
+        .info-output {
+            color: #54a0ff;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MiniDB Web Engine</h1>
+        <p>In-Memory Database System - Interactive CLI & Visualizer</p>
+    </header>
+
+    <div class="container">
+        <!-- Terminal Panel -->
+        <div class="terminal-panel">
+            <div class="terminal-header">
+                <span>📟 Database CLI Terminal</span>
+                <div class="connection-status">
+                    <div class="status-dot"></div>
+                    <span>Connected</span>
+                </div>
+            </div>
+            <div id="terminal-output">Starting MiniDB Web Engine v1.0...\nType 'help' for available commands.</div>
+            <div id="terminal-input-wrapper">
+                <input type="text" id="terminal-input" placeholder="Enter command..." autofocus>
+                <button id="execute-btn">Execute</button>
+            </div>
+            
+            <div class="command-help">
+                <h4>🚀 Quick Commands:</h4>
+                <div class="command-list">
+                    <div class="command"><code>help</code> - Show all commands</div>
+                    <div class="command"><code>menu</code> - Show main menu</div>
+                    <div class="command"><code>create table users (id PK, name, email)</code> - Create table</div>
+                    <div class="command"><code>insert into users values (1, 'John', 'john@example.com')</code> - Insert row</div>
+                    <div class="command"><code>select * from users</code> - Query table</div>
+                    <div class="command"><code>join users and orders on user_id</code> - Inner join</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualization Panel -->
+        <div class="viz-panel">
+            <!-- Table Data View -->
+            <div class="table-viz" id="table-visualization">
+                <h3>📊 Table Data Viewer</h3>
+                <p style="color: #666; font-style: italic;">No table selected. Run a SELECT command or choose option 1 from menu.</p>
+            </div>
+
+            <!-- Schema Relationship View -->
+            <div class="relationship-viz">
+                <h3>🔗 Database Schema & Relationships</h3>
+                <div id="schema-diagram" class="schema-diagram">
+                    <p style="color: #666; font-style: italic;">No tables created yet. Create your first table to see the schema diagram.</p>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff9f43;"></div>
+                        <span>Primary Key (PK)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #54a0ff;"></div>
+                        <span>Foreign Key (FK)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4ecdc4;"></div>
+                        <span>Connected Table</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #95a5a6;"></div>
+                        <span>Standalone Table</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // DATABASE ENGINE CORE (Pure JavaScript implementation of MiniDB)
+        // =========================================================================
+
+        class Table {
+            constructor(name, columns) {
+                this.name = name;
+                this.columns = columns; // [{name, type, isPK, isFK, refTable}]
+                this.rows = [];
+                this.indexes = {}; // Hash indexes for PK and indexed columns
+                this.pkColumn = columns.find(col => col.isPK)?.name || null;
+                this.fkColumns = columns.filter(col => col.isFK).map(col => col.name);
+                
+                // Build index for PK if exists
+                if (this.pkColumn) {
+                    this.indexes[this.pkColumn] = new Map();
+                }
+            }
+
+            insert(values) {
+                if (values.length !== this.columns.length) {
+                    throw new Error(`Column count mismatch. Expected ${this.columns.length}, got ${values.length}`);
+                }
+
+                // Check PK uniqueness
+                if (this.pkColumn) {
+                    const pkIndex = this.columns.findIndex(col => col.name === this.pkColumn);
+                    const pkValue = values[pkIndex];
+                    if (this.indexes[this.pkColumn].has(pkValue)) {
+                        throw new Error(`Duplicate primary key value: ${pkValue}`);
+                    }
+                }
+
+                // Add row
+                this.rows.push([...values]);
+                
+                // Update indexes
+                this.updateIndexes(values);
+                return true;
+            }
+
+            updateIndexes(values) {
+                this.columns.forEach((col, idx) => {
+                    if (this.indexes[col.name]) {
+                        const value = values[idx];
+                        if (!this.indexes[col.name].has(value)) {
+                            this.indexes[col.name].set(value, []);
+                        }
+                        this.indexes[col.name].get(value).push(this.rows.length - 1);
+                    }
+                });
+            }
+
+            select(where = null) {
+                if (!where) return this.rows;
+                
+                const {column, operator, value} = where;
+                const colIndex = this.columns.findIndex(col => col.name === column);
+                if (colIndex === -1) throw new Error(`Column ${column} not found`);
+
+                // Use index if available
+                if (this.indexes[column] && operator === '=') {
+                    const rowIndices = this.indexes[column].get(value) || [];
+                    return rowIndices.map(idx => this.rows[idx]);
+                }
+
+                // Full scan
+                return this.rows.filter(row => {
+                    const cellValue = row[colIndex];
+                    return this.evaluateCondition(cellValue, operator, value);
+                });
+            }
+
+            evaluateCondition(cellValue, operator, targetValue) {
+                const numCell = parseFloat(cellValue);
+                const numTarget = parseFloat(targetValue);
+                
+                switch(operator) {
+                    case '=': return cellValue == targetValue;
+                    case '!=': return cellValue != targetValue;
+                    case '>': return numCell > numTarget;
+                    case '<': return numCell < numTarget;
+                    case '>=': return numCell >= numTarget;
+                    case '<=': return numCell <= numTarget;
+                    default: return false;
+                }
+            }
+
+            exportCSV() {
+                let csv = this.columns.map(col => col.name).join(',') + '\n';
+                csv += this.rows.map(row => row.join(',')).join('\n');
+                return csv;
+            }
+
+            getSchemaInfo() {
+                return {
+                    name: this.name,
+                    columns: this.columns,
+                    rowCount: this.rows.length,
+                    pkColumn: this.pkColumn,
+                    fkColumns: this.fkColumns,
+                    isConnected: this.fkColumns.length > 0
+                };
+            }
+        }
+
+        class Database {
+            constructor() {
+                this.tables = new Map();
+            }
+
+            createTable(name, columns) {
+                if (this.tables.has(name)) {
+                    throw new Error(`Table ${name} already exists`);
+                }
+                this.tables.set(name, new Table(name, columns));
+            }
+
+            getTable(name) {
+                if (!this.tables.has(name)) {
+                    throw new Error(`Table ${name} does not exist`);
+                }
+                return this.tables.get(name);
+            }
+
+            listTables() {
+                return Array.from(this.tables.keys());
+            }
+
+            displayTable(name) {
+                const table = this.getTable(name);
+                const rows = table.select();
+                return this.formatTable(table.columns, rows);
+            }
+
+            formatTable(columns, rows) {
+                let output = '';
+                // Header
+                output += columns.map(col => col.name.padEnd(15)).join('') + '\n';
+                output += '-'.repeat(columns.length * 16) + '\n';
+                // Rows
+                rows.forEach(row => {
+                    output += row.map(cell => String(cell).padEnd(15)).join('') + '\n';
+                });
+                return output;
+            }
+
+            parseSQL(sql) {
+                const selectRegex = /SELECT \* FROM (\w+)(?: WHERE (\w+) ([=!<>]+) (.+))?/i;
+                const match = sql.match(selectRegex);
+                
+                if (match) {
+                    const [, tableName, whereCol, operator, whereVal] = match;
+                    let where = null;
+                    if (whereCol) {
+                        where = {
+                            column: whereCol,
+                            operator: operator,
+                            value: whereVal.replace(/['"]/g, '')
+                        };
+                    }
+                    return {type: 'select', tableName, where};
+                }
+                
+                throw new Error('Invalid SQL syntax. Use: SELECT * FROM table [WHERE col = value]');
+            }
+
+            innerJoin(leftTable, rightTable, leftKey, rightKey) {
+                const left = this.getTable(leftTable);
+                const right = this.getTable(rightTable);
+                
+                const leftIdx = left.columns.findIndex(col => col.name === leftKey);
+                const rightIdx = right.columns.findIndex(col => col.name === rightKey);
+                
+                if (leftIdx === -1) throw new Error(`Column ${leftKey} not found in ${leftTable}`);
+                if (rightIdx === -1) throw new Error(`Column ${rightKey} not found in ${rightTable}`);
+
+                // Build join result
+                const joinedRows = [];
+                
+                left.rows.forEach(leftRow => {
+                    right.rows.forEach(rightRow => {
+                        if (leftRow[leftIdx] == rightRow[rightIdx]) {
+                            joinedRows.push([...leftRow, ...rightRow]);
+                        }
+                    });
+                });
+
+                // Create combined columns
+                const leftCols = left.columns.map(col => ({...col, name: `${leftTable}.${col.name}`}));
+                const rightCols = right.columns.map(col => ({...col, name: `${rightTable}.${col.name}`}));
+                const combinedColumns = [...leftCols, ...rightCols];
+
+                return {
+                    columns: combinedColumns,
+                    rows: joinedRows,
+                    rowCount: joinedRows.length
+                };
+            }
+
+            getSchema() {
+                const schema = {
+                    tables: {},
+                    connections: []
+                };
+
+                this.tables.forEach(table => {
+                    const info = table.getSchemaInfo();
+                    schema.tables[table.name] = info;
+                    
+                    // Check for FK relationships
+                    info.columns.forEach(col => {
+                        if (col.isFK && col.refTable) {
+                            schema.connections.push({
+                                from: table.name,
+                                to: col.refTable,
+                                fromColumn: col.name,
+                                type: 'FK'
+                            });
+                        }
+                    });
+                });
+
+                return schema;
+            }
+        }
+
+        // =========================================================================
+        // APPLICATION CONTROLLER
+        // =========================================================================
+
+        class MiniDBWeb {
+            constructor() {
+                this.db = new Database();
+                this.currentTable = null;
+                this.terminal = document.getElementById('terminal-output');
+                this.input = document.getElementById('terminal-input');
+                
+                this.initializeDatabase();
+                this.setupEventListeners();
+                this.showMenu();
+            }
+
+            initializeDatabase() {
+                // Pre-load sample data (like the C++ version does with CSV)
+                try {
+                    // Create employees table
+                    this.db.createTable('employees', [
+                        {name: 'empID', type: 'string', isPK: true, isFK: false},
+                        {name: 'name', type: 'string', isPK: false, isFK: false},
+                        {name: 'department', type: 'string', isPK: false, isFK: false},
+                        {name: 'salary', type: 'int', isPK: false, isFK: false}
+                    ]);
+
+                    // Insert sample employees
+                    const employees = [
+                        ['E001', 'John Doe', 'Engineering', '75000'],
+                        ['E002', 'Jane Smith', 'Marketing', '65000'],
+                        ['E003', 'Bob Johnson', 'Engineering', '70000'],
+                        ['E004', 'Alice Brown', 'HR', '60000'],
+                        ['E005', 'Charlie Wilson', 'Sales', '68000']
+                    ];
+                    employees.forEach(emp => this.db.getTable('employees').insert(emp));
+
+                    // Create departments table
+                    this.db.createTable('departments', [
+                        {name: 'deptID', type: 'string', isPK: true, isFK: false},
+                        {name: 'deptName', type: 'string', isPK: false, isFK: false},
+                        {name: 'manager', type: 'string', isPK: false, isFK: false}
+                    ]);
+
+                    // Insert sample departments
+                    const departments = [
+                        ['D001', 'Engineering', 'E001'],
+                        ['D002', 'Marketing', 'E002'],
+                        ['D003', 'HR', 'E004'],
+                        ['D004', 'Sales', 'E005']
+                    ];
+                    departments.forEach(dept => this.db.getTable('departments').insert(dept));
+
+                    this.print('✅ Loaded sample data (employees, departments)', 'success');
+                } catch (e) {
+                    this.print(`⚠️ Error loading sample data: ${e.message}`, 'error');
+                }
+            }
+
+            setupEventListeners() {
+                document.getElementById('execute-btn').addEventListener('click', () => this.executeCommand());
+                this.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.executeCommand();
+                });
+            }
+
+            print(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const prefix = {
+                    'error': '❌',
+                    'success': '✅',
+                    'info': 'ℹ️',
+                    'output': '📤'
+                }[type] || 'ℹ️';
+                
+                this.terminal.innerHTML += `\n[${timestamp}] ${prefix} ${message}`;
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+
+            clearTerminal() {
+                this.terminal.innerHTML = '';
+            }
+
+            showMenu() {
+                const menu = `
+═══════════════════════════════════════════════════════════════
+                         MINIDB MAIN MENU                                 
+═══════════════════════════════════════════════════════════════
+1. 📋 Display Table
+2. 🔍 Run SQL Query
+3. 💾 Export Table to CSV
+4. 🔗 Inner Join
+5. ➕ Create New Table
+6. ✏️  Insert Into Table
+7. 📊 Show Schema Diagram
+0. 🚪 Exit
+
+Type a number (1-7) or use direct SQL/commands.
+═══════════════════════════════════════════════════════════════
+                `;
+                this.print(menu, 'info');
+            }
+
+            executeCommand() {
+                const command = this.input.value.trim();
+                if (!command) return;
+                
+                this.print(`$ ${command}`, 'info');
+                
+                try {
+                    // Parse command
+                    if (command === 'menu') {
+                        this.showMenu();
+                    } else if (command === 'help') {
+                        this.showHelp();
+                    } else if (command === 'clear') {
+                        this.clearTerminal();
+                    } else if (command === '7' || command === 'schema') {
+                        this.showSchemaDiagram();
+                    } else if (command === '1') {
+                        this.handleDisplayTable();
+                    } else if (command === '2') {
+                        this.print('Enter SQL query (e.g., SELECT * FROM employees WHERE salary > 70000)', 'info');
+                        this.input.value = 'SELECT * FROM employees WHERE ';
+                    } else if (command === '3') {
+                        this.handleExport();
+                    } else if (command === '4') {
+                        this.print('Join syntax: join employees and departments on empID', 'info');
+                    } else if (command === '5') {
+                        this.print('Create syntax: create table users (id PK, name, email FK references employees)', 'info');
+                    } else if (command === '6') {
+                        this.print('Insert syntax: insert into users values (1, John, john@example.com)', 'info');
+                    } else if (command === '0') {
+                        this.print('Thank you for using MiniDB Web Engine!', 'success');
+                        this.input.disabled = true;
+                    } else if (command.toUpperCase().startsWith('SELECT')) {
+                        this.handleSQL(command);
+                    } else if (command.toLowerCase().startsWith('create table')) {
+                        this.handleCreateTable(command);
+                    } else if (command.toLowerCase().startsWith('insert into')) {
+                        this.handleInsert(command);
+                    } else if (command.toLowerCase().startsWith('join')) {
+                        this.handleJoin(command);
+                    } else if (command.toLowerCase() === 'list tables') {
+                        this.handleListTables();
+                    } else {
+                        this.print(`Unknown command: ${command}`, 'error');
+                        this.print("Type 'help' for available commands.", 'info');
+                    }
+                } catch (e) {
+                    this.print(`Error: ${e.message}`, 'error');
+                }
+
+                this.input.value = '';
+            }
+
+            showHelp() {
+                const help = `
+═══════════════════════════════════════════════════════════════
+                         COMMAND HELP                                 
+═══════════════════════════════════════════════════════════════
+
+📁 TABLE OPERATIONS:
+  create table <name> (col1 PK, col2, col3 FK ref <table>)
+  insert into <table> values (val1, val2, val3)
+  select * from <table> [WHERE col = val]
+  list tables
+
+🔗 JOIN OPERATIONS:
+  join <table1> and <table2> on <column>
+
+💾 UTILITY:
+  export <table>          - Export to CSV
+  display <table>         - Show table contents
+  schema                  - Show schema diagram
+  menu                    - Show main menu
+  help                    - Show this help
+  clear                   - Clear terminal
+  exit                    - Exit application
+═══════════════════════════════════════════════════════════════
+                `;
+                this.print(help, 'info');
+            }
+
+            handleSQL(sql) {
+                try {
+                    const result = this.db.parseSQL(sql);
+                    const table = this.db.getTable(result.tableName);
+                    const rows = table.select(result.where);
+                    
+                    this.print(`Found ${rows.length} row(s)`, 'success');
+                    this.displayTableInViz(table.columns, rows, result.tableName);
+                    
+                    // Show terminal output
+                    const output = this.db.formatTable(table.columns, rows);
+                    this.print(output, 'output');
+                } catch (e) {
+                    this.print(`SQL Error: ${e.message}`, 'error');
+                }
+            }
+
+            handleCreateTable(command) {
+                // Parse: create table users (id PK, name, email FK ref employees)
+                const match = command.match(/create table (\w+) \((.+)\)/i);
+                if (!match) {
+                    throw new Error('Invalid CREATE TABLE syntax');
+                }
+
+                const [, tableName, colDefs] = match;
+                const columns = colDefs.split(',').map(col => col.trim()).map(colDef => {
+                    const parts = colDef.split(/\s+/);
+                    const name = parts[0];
+                    const isPK = parts.includes('PK');
+                    const isFK = parts.includes('FK');
+                    const refIndex = parts.indexOf('ref');
+                    const refTable = refIndex !== -1 ? parts[refIndex + 1] : null;
+                    
+                    return {name, type: 'string', isPK, isFK, refTable};
+                });
+
+                this.db.createTable(tableName, columns);
+                this.print(`Table '${tableName}' created successfully!`, 'success');
+                this.updateSchemaDiagram();
+            }
+
+            handleInsert(command) {
+                // Parse: insert into users values (1, 'John', 'john@example.com')
+                const match = command.match(/insert into (\w+) values \((.+)\)/i);
+                if (!match) {
+                    throw new Error('Invalid INSERT syntax');
+                }
+
+                const [, tableName, valuesStr] = match;
+                const values = valuesStr.split(',').map(v => v.trim().replace(/['"]/g, ''));
+                
+                const table = this.db.getTable(tableName);
+                table.insert(values);
+                this.print(`Row inserted into '${tableName}'`, 'success');
+                this.updateSchemaDiagram();
+            }
+
+            handleDisplayTable() {
+                const tables = this.db.listTables();
+                if (tables.length === 0) {
+                    this.print('No tables available', 'error');
+                    return;
+                }
+
+                this.print('Available tables: ' + tables.join(', '), 'info');
+                const tableName = prompt('Enter table name to display:');
+                if (!tableName) return;
+
+                try {
+                    const table = this.db.getTable(tableName);
+                    const rows = table.select();
+                    this.print(`Displaying ${rows.length} row(s) from ${tableName}`, 'info');
+                    const output = this.db.formatTable(table.columns, rows);
+                    this.print(output, 'output');
+                    
+                    this.displayTableInViz(table.columns, rows, tableName);
+                } catch (e) {
+                    this.print(e.message, 'error');
+                }
+            }
+
+            handleListTables() {
+                const tables = this.db.listTables();
+                this.print(`Tables in database: ${tables.length}`, 'info');
+                tables.forEach(table => {
+                    const t = this.db.getTable(table);
+                    this.print(`  - ${table} (${t.rows.length} rows)`, 'output');
+                });
+                this.updateSchemaDiagram();
+            }
+
+            handleExport() {
+                const tableName = prompt('Enter table name to export:');
+                if (!tableName) return;
+
+                try {
+                    const table = this.db.getTable(tableName);
+                    const csv = table.exportCSV();
+                    
+                    // Download as file
+                    const blob = new Blob([csv], {type: 'text/csv'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${tableName}.csv`;
+                    a.click();
+                    
+                    this.print(`Table '${tableName}' exported to ${tableName}.csv`, 'success');
+                } catch (e) {
+                    this.print(e.message, 'error');
+                }
+            }
+
+            handleJoin(command) {
+                const match = command.match(/join (\w+) and (\w+) on (\w+)/i);
+                if (!match) {
+                    this.print('Usage: join table1 and table2 on column', 'error');
+                    return;
+                }
+
+                const [, leftTable, rightTable, column] = match;
+                try {
+                    const result = this.db.innerJoin(leftTable, rightTable, column, column);
+                    this.print(`Join completed: ${result.rowCount} rows`, 'success');
+                    
+                    // Update visualization
+                    this.currentTable = {name: `${leftTable} ⨝ ${rightTable}`, ...result};
+                    this.displayTableInViz(result.columns, result.rows, this.currentTable.name);
+                    
+                    // Show in terminal
+                    const output = this.db.formatTable(result.columns, result.rows);
+                    this.print(output, 'output');
+                } catch (e) {
+                    this.print(`Join Error: ${e.message}`, 'error');
+                }
+            }
+
+            displayTableInViz(columns, rows, tableName) {
+                const vizDiv = document.getElementById('table-visualization');
+                let html = `<h3>📊 Table: ${tableName} <span style="font-size: 13px; color: #666;">(${rows.length} rows)</span></h3>`;
+                
+                if (rows.length === 0) {
+                    html += `<p style="color: #666; font-style: italic;">No data in table</p>`;
+                } else {
+                    html += '<div class="table-data"><table><thead><tr>';
+                    
+                    // Headers with PK/FK indicators
+                    columns.forEach(col => {
+                        let label = col.name;
+                        if (col.isPK) label += ' <span class="pk-indicator">PK</span>';
+                        if (col.isFK) label += ' <span class="fk-indicator">FK</span>';
+                        html += `<th>${label}</th>`;
+                    });
+                    
+                    html += '</tr></thead><tbody>';
+                    
+                    // Data rows
+                    rows.slice(0, 50).forEach(row => { // Limit to 50 rows for performance
+                        html += '<tr>';
+                        row.forEach(cell => {
+                            html += `<td>${escapeHtml(String(cell))}</td>`;
+                        });
+                        html += '</tr>';
+                    });
+                    
+                    if (rows.length > 50) {
+                        html += `<tr><td colspan="${columns.length}" style="text-align: center; color: #666;">... and ${rows.length - 50} more rows</td></tr>`;
+                    }
+                    
+                    html += '</tbody></table></div>';
+                }
+                
+                vizDiv.innerHTML = html;
+            }
+
+            showSchemaDiagram() {
+                this.updateSchemaDiagram();
+                this.print('Schema diagram updated', 'success');
+            }
+
+            updateSchemaDiagram() {
+                const schema = this.db.getSchema();
+                const diagramDiv = document.getElementById('schema-diagram');
+                
+                if (Object.keys(schema.tables).length === 0) {
+                    diagramDiv.innerHTML = '<p style="color: #666; font-style: italic;">No tables created yet. Create your first table to see the schema diagram.</p>';
+                    return;
+                }
+
+                let html = '';
+                const connectedTables = new Set();
+                
+                // First pass: identify connected tables
+                schema.connections.forEach(conn => {
+                    connectedTables.add(conn.from);
+                    connectedTables.add(conn.to);
+                });
+
+                // Create table cards
+                Object.values(schema.tables).forEach(table => {
+                    const isConnected = connectedTables.has(table.name) || table.fkColumns.length > 0;
+                    const cardClass = isConnected ? 'connected' : 'standalone';
+                    const icon = isConnected ? '🔗' : '📦';
+                    
+                    html += `
+                        <div class="table-card ${cardClass}">
+                            <h4>${icon} ${table.name}</h4>
+                            <div class="column-list">
+                                <div style="color: #666; font-size: 11px; margin-bottom: 5px;">
+                                    ${table.rowCount} rows
+                                </div>
+                    `;
+                    
+                    table.columns.forEach(col => {
+                        let indicators = [];
+                        if (col.isPK) indicators.push('PK');
+                        if (col.isFK) indicators.push('FK');
+                        const indicator = indicators.length > 0 ? `(${indicators.join(',')})` : '';
+                        html += `<div>${col.name} <span style="color: #999; font-size: 11px;">${indicator}</span></div>`;
+                    });
+                    
+                    html += '</div></div>';
+                });
+
+                diagramDiv.innerHTML = html;
+            }
+        }
+
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // =========================================================================
+        // INITIALIZE APPLICATION
+        // =========================================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = new MiniDBWeb();
+            
+            // Expose to global for debugging
+            window.minidb = app;
+            
+            // Focus input
+            document.getElementById('terminal-input').focus();
+            
+            // Welcome message
+            setTimeout(() => {
+                app.print('MiniDB Web Engine ready!', 'success');
+                app.print('Sample tables loaded: employees, departments', 'info');
+                app.print('Try: SELECT * FROM employees WHERE salary > 70000', 'info');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

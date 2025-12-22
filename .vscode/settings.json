@@ -100,5 +100,6 @@
     "unordered_map": "cpp",
     "variant": "cpp",
     "vector": "cpp"
-  }
+  },
+  "cmake.ignoreCMakeListsMissing": true
 }
