@@ -1,11 +1,11 @@
-empID,name,deptID,salary,position
-E001,Alice Smith,101,85000,Senior Engineer
-E002,Bob Johnson,102,62000,Marketing Manager
-E003,Carol Davis,101,90000,Lead Developer
-E004,David Wilson,103,58000,Sales Representative
-E005,Eva Brown,104,72000,HR Manager
-E006,Frank Miller,103,61000,Sales Lead
-E007,Grace Lee,105,78000,Financial Analyst
-E008,Henry Taylor,101,73000,Junior Engineer
-E009,Ivy Clark,102,54000,Marketing Specialist
-E010,Jack Lewis,105,82000,Senior Accountant
+empID,name,age,deptID
+101,Alice,25,d10
+102,Bob,35,d20
+103,Carol,40,d10
+104,David,28,d30
+105,Eve,32,d20
+106,Frank,45,d10
+107,Grace,29,d30
+508,Hank,38,d20
+109,Ivy,33,d10
+110,Jack,41,d30
