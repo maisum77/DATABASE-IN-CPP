@@ -43,26 +43,76 @@ def save_table_to_csv(table_name, data):
         print(f"Error saving CSV: {e}")
         return False
 
+# def load_table_from_csv(filename, table_name):
+#     """Load table data from CSV file"""
+#     try:
+#         with open(filename, 'r') as f:
+#             reader = csv.reader(f)
+#             rows = list(reader)
+#             if not rows:
+#                 return None
+            
+#             # First row is header (columns)
+#             columns = rows[0] if rows else []
+#             data_rows = rows[1:] if len(rows) > 1 else []
+            
+#             return {
+#                 'columns': columns,
+#                 'rows': data_rows
+#             }
+#     except Exception as e:
+#         print(f"Error loading CSV: {e}")
+#         return None
 def load_table_from_csv(filename, table_name):
     """Load table data from CSV file"""
+    print(f"Loading CSV from: {filename}")
+    
     try:
-        with open(filename, 'r') as f:
-            reader = csv.reader(f)
-            rows = list(reader)
+        import csv
+        
+        with open(filename, 'r', encoding='utf-8-sig') as f:  # Handle BOM
+            # Try different delimiters
+            sample = f.read(1024)
+            f.seek(0)
+            
+            # Detect delimiter
+            sniffer = csv.Sniffer()
+            try:
+                delimiter = sniffer.sniff(sample).delimiter
+            except:
+                delimiter = ','  # Default
+            
+            print(f"Using delimiter: {repr(delimiter)}")
+            
+            reader = csv.reader(f, delimiter=delimiter)
+            rows = []
+            
+            for row in reader:
+                # Skip empty rows
+                if row and any(cell.strip() for cell in row):
+                    rows.append([cell.strip() for cell in row])
+            
             if not rows:
+                print("Error: No data in CSV")
                 return None
             
             # First row is header (columns)
-            columns = rows[0] if rows else []
+            columns = rows[0]
             data_rows = rows[1:] if len(rows) > 1 else []
+            
+            print(f"Loaded {len(columns)} columns, {len(data_rows)} rows")
             
             return {
                 'columns': columns,
                 'rows': data_rows
             }
+            
     except Exception as e:
         print(f"Error loading CSV: {e}")
+        import traceback
+        print(traceback.format_exc())
         return None
+
 
 def parse_create_command(output):
     """Parse CREATE TABLE output to get columns"""
@@ -178,8 +228,8 @@ def insert_row(table_name):
         'row': row
     }), 201
 
-@app.route('/api/query', methods=['POST'])
-def execute_query():
+# @app.route('/api/query', methods=['POST'])
+# def execute_query():
     """Execute a SQL-like query"""
     data = request.json
     query = data.get('query', '').strip()
@@ -389,6 +439,126 @@ def execute_query():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/query', methods=['POST'])
+def execute_query():
+    """Execute a SQL-like query"""
+    data = request.json
+    query = data.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'Query is required'}), 400
+    
+    # IMPORTANT: Make query case-insensitive
+    query_upper = query.upper()
+    
+    try:
+        # Simple SELECT parsing
+        if query_upper.startswith('SELECT'):
+            # Extract table name - handle both upper and lower case
+            parts = query_upper.split('FROM')
+            if len(parts) < 2:
+                return jsonify({'error': 'Invalid SELECT syntax - missing FROM'}), 400
+            
+            select_part = parts[0].strip()
+            rest = parts[1].strip()
+            
+            # Get table name (before WHERE)
+            where_idx = rest.find('WHERE')
+            if where_idx != -1:
+                table_name = rest[:where_idx].strip()
+                where_clause = rest[where_idx+6:].strip()
+            else:
+                table_name = rest.strip().rstrip(';')
+                where_clause = None
+            
+            # Convert table name to lowercase for lookup
+            table_name = table_name.lower()
+            
+            print(f"DEBUG: Looking for table: {table_name}")
+            print(f"DEBUG: Available tables: {list(current_tables.keys())}")
+            
+            if table_name not in current_tables:
+                return jsonify({
+                    'error': f'Table "{table_name}" not found',
+                    'available_tables': list(current_tables.keys())
+                }), 404
+            
+            table = current_tables[table_name]
+            columns = table['columns']
+            rows = table['rows']
+            
+            # Apply WHERE clause if present
+            if where_clause:
+                # Parse WHERE: column OP value
+                where_parts = where_clause.split()
+                if len(where_parts) >= 3:
+                    col_name = where_parts[0].strip().lower()
+                    op = where_parts[1].strip()
+                    value = ' '.join(where_parts[2:]).strip().rstrip(';')
+                    
+                    # Find column (case-insensitive)
+                    col_idx = None
+                    for i, col in enumerate(columns):
+                        if col.lower() == col_name:
+                            col_idx = i
+                            break
+                    
+                    if col_idx is not None:
+                        filtered_rows = []
+                        for row in rows:
+                            try:
+                                row_val = row[col_idx]
+                                
+                                # Try numeric comparison first
+                                try:
+                                    row_num = float(row_val)
+                                    cmp_num = float(value)
+                                    
+                                    if op == '=' or op == '==':
+                                        condition = row_num == cmp_num
+                                    elif op == '!=':
+                                        condition = row_num != cmp_num
+                                    elif op == '>':
+                                        condition = row_num > cmp_num
+                                    elif op == '<':
+                                        condition = row_num < cmp_num
+                                    elif op == '>=':
+                                        condition = row_num >= cmp_num
+                                    elif op == '<=':
+                                        condition = row_num <= cmp_num
+                                    else:
+                                        condition = False
+                                        
+                                except (ValueError, TypeError):
+                                    # String comparison
+                                    if op == '=' or op == '==':
+                                        condition = str(row_val).lower() == str(value).lower()
+                                    elif op == '!=':
+                                        condition = str(row_val).lower() != str(value).lower()
+                                    else:
+                                        condition = False
+                                
+                                if condition:
+                                    filtered_rows.append(row)
+                            except Exception as e:
+                                print(f"Error filtering row: {e}")
+                                pass
+                        rows = filtered_rows
+            
+            return jsonify({
+                'columns': columns,
+                'rows': rows,
+                'row_count': len(rows)
+            })
+        
+        return jsonify({'error': f'Unsupported query type. Only SELECT is fully supported.'}), 400
+        
+    except Exception as e:
+        import traceback
+        print(f"Query error: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Query execution error: {str(e)}'}), 500
+
 @app.route('/api/join', methods=['POST'])
 def perform_join():
     """Perform INNER JOIN between two tables"""
@@ -445,8 +615,8 @@ def perform_join():
         'row_count': len(result_rows)
     })
 
-@app.route('/api/tables/<table_name>/import', methods=['POST'])
-def import_csv(table_name):
+# @app.route('/api/tables/<table_name>/import', methods=['POST'])
+# def import_csv(table_name):
     """Import data from CSV file"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -483,6 +653,76 @@ def import_csv(table_name):
         if os.path.exists(temp_path):
             os.remove(temp_path)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tables/<table_name>/import', methods=['POST'])
+def import_csv(table_name):
+    """Import data from CSV file"""
+    global current_tables
+    print(f"\n=== CSV Import Request for table: {table_name} ===")
+    
+    if 'file' not in request.files:
+        print("Error: No file in request")
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        print("Error: Empty filename")
+        return jsonify({'error': 'No file selected'}), 400
+    
+    print(f"File received: {file.filename}")
+    
+    # Save temporary file
+    import tempfile
+    import os
+    
+    # Use system temp directory
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, f"minidb_import_{file.filename}")
+    
+    print(f"Saving to: {temp_path}")
+    
+    try:
+        # Save uploaded file
+        file.save(temp_path)
+        print(f"File saved successfully")
+        
+        # Load CSV data
+        csv_data = load_table_from_csv(temp_path, table_name)
+        
+        if csv_data is None:
+            print("Error: Failed to parse CSV")
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return jsonify({'error': 'Failed to parse CSV file. Check format.'}), 400
+        
+        print(f"CSV parsed: {len(csv_data.get('columns', []))} columns, {len(csv_data.get('rows', []))} rows")
+        
+        # Create or update table
+        current_tables[table_name] = csv_data
+        
+        # Clean up
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            print("Temp file cleaned up")
+        
+        print(f"SUCCESS: Table {table_name} imported")
+        
+        return jsonify({
+            'message': f'Table {table_name} imported successfully',
+            'columns': csv_data['columns'],
+            'row_count': len(csv_data['rows'])
+        }), 201
+        
+    except Exception as e:
+        import traceback
+        print(f"Import error: {e}")
+        print(traceback.format_exc())
+        
+        # Clean up on error
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        return jsonify({'error': f'Import failed: {str(e)}'}), 500
 
 @app.route('/api/tables/<table_name>/export', methods=['GET'])
 def export_csv(table_name):
